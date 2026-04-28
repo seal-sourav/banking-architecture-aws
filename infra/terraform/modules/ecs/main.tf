@@ -1,0 +1,44 @@
+resource "aws_ecs_cluster" "this" {
+  name = "${var.project_name}-cluster"
+}
+
+resource "aws_ecs_task_definition" "this" {
+  family                   = "${var.project_name}-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+
+  cpu    = "512"
+  memory = "1024"
+
+  execution_role_arn = var.execution_role_arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "app"
+      image     = var.container_image
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 8080
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
+
+resource "aws_ecs_service" "this" {
+  name            = "${var.project_name}-service"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.this.arn
+  desired_count   = 2
+
+  launch_type = "FARGATE"
+
+  network_configuration {
+    subnets          = var.private_subnet_ids
+    security_groups  = [var.ecs_security_group_id]
+    assign_public_ip = false
+  }
+}
